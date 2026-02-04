@@ -505,3 +505,88 @@ if os.path.isfile(telemetry_path):
     tel = _read_json(telemetry_path)
     df = pd.DataFrame({
         "t_sec": tel["timeseries"]["t_sec"],
+        "cpu_util_pct": tel["timeseries"]["cpu_util_pct"],
+        "mem_used_gb": tel["timeseries"]["mem_used_gb"],
+        "temp_c": tel["timeseries"]["temp_c"],
+        "power_w": tel["timeseries"]["power_w"],
+    })
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("CPU peak", f"{df['cpu_util_pct'].max():.1f}%")
+    m2.metric("Mem peak", f"{df['mem_used_gb'].max():.1f} GB")
+    m3.metric("Thermal peak", f"{df['temp_c'].max():.1f} °C")
+    m4.metric("Power peak", f"{df['power_w'].max():.0f} W")
+
+    st.plotly_chart(px.line(df, x="t_sec", y="cpu_util_pct", title="CPU Utilization (%)"), use_container_width=True)
+    st.plotly_chart(px.line(df, x="t_sec", y="mem_used_gb", title="Memory Used (GB)"), use_container_width=True)
+    st.plotly_chart(px.line(df, x="t_sec", y="temp_c", title="Thermal Sensor (°C)"), use_container_width=True)
+    st.plotly_chart(px.line(df, x="t_sec", y="power_w", title="Power Draw (W)"), use_container_width=True)
+else:
+    st.info("Telemetry charts appear after a validation run (single mode).")
+
+
+st.divider()
+st.subheader("Fleet Triage (heatmap + top offenders)")
+
+fleet_csv = os.path.join(OUT_DIR, "fleet_snapshot.csv")
+if os.path.isfile(fleet_csv):
+    fleet_df = pd.read_csv(fleet_csv)
+
+    # Heatmap across subsystems for top N offenders
+    top_n = 20 if len(fleet_df) >= 20 else len(fleet_df)
+    offenders = fleet_df.sort_values("overall_score", ascending=True).head(top_n)
+
+    heat = offenders[["server_id"] + SUBSYSTEMS].copy()
+    heat_melt = heat.melt(id_vars=["server_id"], var_name="subsystem", value_name="score")
+
+    fig = px.density_heatmap(
+        heat_melt,
+        x="subsystem",
+        y="server_id",
+        z="score",
+        title=f"Subsystem Health Heatmap (Top {top_n} lowest overall scores)",
+        histfunc="avg"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Top offenders table
+    st.subheader("Top Offenders (actionable triage list)")
+    offenders_table = fleet_df.sort_values("overall_score", ascending=True).head(10)[
+        ["server_id", "overall_score", "temp_peak_c", "packet_loss_pct", "ecc_events", "cpu_peak_pct"]
+    ]
+    st.dataframe(offenders_table, use_container_width=True, hide_index=True)
+
+    # Per-server pass/fail drilldown
+    st.subheader("Drilldown: per-server subsystem status")
+    pick = st.selectbox("Select server", list(fleet_df["server_id"].values))
+    row = fleet_df[fleet_df["server_id"] == pick].iloc[0].to_dict()
+    drill = _subsystem_summary(pick, injected, fleet_row=row)
+    styled = drill.style.applymap(_status_color, subset=["status"])
+    st.dataframe(styled, use_container_width=True, hide_index=True)
+
+else:
+    st.info("Switch Mode → fleet and run validation to generate fleet heatmap + offenders list.")
+
+
+st.divider()
+st.subheader("Generated Artifacts (audit trail)")
+
+if os.path.isdir(OUT_DIR):
+    files = sorted(os.listdir(OUT_DIR))
+    if not files:
+        st.info("No artifacts yet. Click **Run Bring-Up Validation**.")
+    else:
+        pick = st.selectbox("Select artifact file", files)
+        path = os.path.join(OUT_DIR, pick)
+        st.write(f"**{pick}**")
+        try:
+            if pick.endswith((".json", ".txt", ".log", ".md", ".yaml", ".yml", ".csv")):
+                with open(path, "r", encoding="utf-8", errors="ignore") as fp:
+                    content = fp.read()
+                st.code(content[:120000], language="json" if pick.endswith(".json") else None)
+            else:
+                st.caption("Binary/other file type.")
+        except Exception as e:
+            st.error(str(e))
+else:
+    st.info("Artifacts folder will be created after the first run.")
