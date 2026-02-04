@@ -1,182 +1,141 @@
-# FleetBringUp
+# FleetBringUp — Server Bring-Up & Validation Framework
 
-Automated server bring-up and validation framework for data center hardware lifecycle testing.
+![CI Demo](https://github.com/prakhardewangan2005-hash/FleetBringUp/actions/workflows/fleetbringup-demo.yml/badge.svg)
+
+**Live Demo (Streamlit):** https://fleetbringup-k9m6w5yyv3sgubkbdu755u.streamlit.app/ 
+**One-Click CI Demo:** Actions → *FleetBringUp — Demo Validation Run* → Run workflow → Download artifact `fleetbringup-output`
+
+---
 
 ## Overview
 
-FleetBringUp automates system-level hardware validation during server bring-up, post-repair verification, and periodic fleet health checks. Built for infrastructure labs running thousands of validation cycles per week.
+FleetBringUp is an internal-style hardware bring-up and system validation framework designed to emulate data-center lab workflows used during server lifecycle testing.
 
-**Core capabilities:**
-- Automated bring-up test suites (CPU, memory, network, thermal, power)
-- Failure injection and detection for hardware subsystem regression testing
-- Config-driven test orchestration for reproducible validation workflows
-- Structured failure reports for cross-functional triage (hardware, kernel, firmware teams)
+The tool focuses on automated validation of CPU, memory, network, power, and thermal subsystems, supports controlled failure injection, and produces artifact-based diagnostics for auditability and triage. It is built to mirror how large-scale infrastructure teams validate and debug hardware at fleet scale.
 
-## Why This Tool Exists
+---
 
-In large-scale data center operations, server bring-up and validation happens continuously:
-- New hardware deployments (ODM qualification, rack-level bring-up)
-- Post-repair validation (RMA returns, component swaps)
-- Fleet health audits (detection of silent data corruption, thermal drift)
+## Key Capabilities
 
-Manual validation doesn't scale. FleetBringUp provides:
-- **Repeatability**: Consistent test execution across lab environments
-- **Speed**: Parallel test execution, ~3-5 min per server
-- **Traceability**: Structured logs for failure root cause analysis
-- **Extensibility**: Modular design for integrating real BMC/IPMI/Redfish APIs
+- **Automated Bring-Up Validation**
+  - CPU, memory, NIC, power, and thermal subsystem checks
+  - Config-driven validation via YAML test plans
+  - Single-server and fleet execution modes
+
+- **Failure Injection (Exclusive)**
+  - Thermal runaway / overheat simulation
+  - ECC corrected-error storm simulation
+  - Network packet-loss degradation
+  - Adjustable severity per failure mode
+
+- **Subsystem Pass/Fail Gating**
+  - Deterministic health scoring per subsystem
+  - PASS / WARN / FAIL classification
+  - Clear failure attribution and triage hints
+
+- **Fleet-Scale Triage**
+  - Subsystem health heatmap across servers
+  - Top-offenders ranking by overall health score
+  - Per-server drill-down for root-cause analysis
+
+- **Artifact-Based Diagnostics**
+  - Timestamped telemetry (CPU, memory, thermal, power)
+  - Validation summaries and fleet snapshots
+  - JSON / CSV artifacts generated on every run
+
+- **Reproducible Execution**
+  - Manual CI runs via GitHub Actions
+  - Public interactive demo via Streamlit
+  - No local setup required
+
+---
 
 ## Architecture
-```
-┌─────────────┐
-│   CLI       │  ← main.py entry point
-└──────┬──────┘
-       │
-┌──────▼───────────────────────────┐
-│  Test Runner (runner/)           │
-│  - Orchestrates test execution   │
-│  - Loads YAML test plans         │
-│  - Manages failure state         │
-└──────┬───────────────────────────┘
-       │
-┌──────▼───────────────────────────┐
-│  Hardware Simulators (simulators/)│
-│  - CPU, Memory, NIC, Thermal     │
-│  - Synthetic telemetry           │
-│  - Controlled failure injection  │
-└──────┬───────────────────────────┘
-       │
-┌──────▼───────────────────────────┐
-│  Test Modules (tests/)           │
-│  - cpu_stress                    │
-│  - memory_integrity              │
-│  - network_connectivity          │
-│  - thermal_power_sanity          │
-└──────────────────────────────────┘
-```
 
-## Installation
-```bash
-cd fleetbringup
-pip install -r requirements.txt
-```
+fleetbringup/
+├─ simulators/  # Hardware and sensor simulation (CPU, memory, NIC, power, thermal)
+├─ tests/       # Validation logic per subsystem
+├─ runner/      # Test orchestration and execution engine
+├─ configs/     # YAML-based validation plans
+├─ reports/     # Generated reports (CI / local)
+└─ main.py      # CLI entrypoint for bring-up validation
+app.py          # Streamlit-based validation console (live demo)
+.github/workflows/  # CI demo workflow (GitHub Actions)
 
-## Usage
+---
 
-### Single Server Validation
-```bash
-python main.py validate --server-id svr-12345 --config configs/default_bringup.yaml
-```
+## Live Demo (Recommended)
 
-### Fleet Validation (Batch Mode)
-```bash
-python main.py validate-fleet --server-list configs/fleet_batch_01.txt --config configs/default_bringup.yaml
-```
+The Streamlit demo provides an interactive validation console:
 
-### Custom Test Plan
-```bash
-python main.py validate --server-id svr-12345 --config configs/stress_thermal.yaml
-```
+1. Open the **Live Demo** link
+2. Select `single` or `fleet` mode
+3. Toggle failure modes (OVERHEAT / ECC_ERROR / PACKET_LOSS)
+4. Run validation
+5. Inspect:
+   - Subsystem pass/fail summary
+   - CPU / Memory / Thermal / Power charts
+   - Fleet health heatmap and top offenders
+   - Generated artifacts (audit trail)
 
-### Failure Injection (Lab Testing)
-```bash
-python main.py validate --server-id svr-12345 --config configs/inject_ecc_error.yaml
-```
+This demo executes the same validation logic used in CI and always produces timestamped artifacts.
 
-## Configuration
+---
 
-Test plans are defined in YAML. Example: `configs/default_bringup.yaml`
-```yaml
-test_plan:
-  name: "Standard Bring-Up Validation"
-  tests:
-    - name: cpu_stress
-      duration_sec: 60
-      failure_threshold: 0.95
-    - name: memory_integrity
-      passes: 3
-      inject_ecc_error: false
-    - name: network_connectivity
-      target_bandwidth_gbps: 10
-      packet_loss_threshold: 0.01
-    - name: thermal_power_sanity
-      max_cpu_temp_c: 85
-      max_dimm_temp_c: 75
-```
+## CI Demo (Reproducible)
 
-## Output
+A manual GitHub Actions workflow is included to demonstrate reproducible bring-up validation:
 
-Results are written to `reports/`:
-```
-reports/
-  svr-12345_20260204_143022_results.json
-  svr-12345_20260204_143022.log
-```
+1. Go to **Actions**
+2. Select **FleetBringUp — Demo Validation Run**
+3. Click **Run workflow**
+4. Choose `single` or `fleet`
+5. Download artifact **`fleetbringup-output`**
 
-Example report:
-```json
-{
-  "server_id": "svr-12345",
-  "timestamp": "2026-02-04T14:30:22Z",
-  "test_plan": "default_bringup.yaml",
-  "overall_status": "FAIL",
-  "tests": [
-    {
-      "name": "cpu_stress",
-      "status": "PASS",
-      "duration_sec": 62.3
-    },
-    {
-      "name": "memory_integrity",
-      "status": "FAIL",
-      "failure_reason": "ECC correctable error detected on DIMM slot 3",
-      "subsystem": "memory"
-    }
-  ],
-  "failure_summary": {
-    "subsystem": "memory",
-    "root_cause": "ECC correctable error",
-    "action": "Replace DIMM slot 3, rerun validation"
-  }
-}
-```
+Artifacts include validation summaries, telemetry, and proof of execution.
 
-## Extending to Real Hardware
+---
 
-Current implementation uses simulators for portability. To integrate real hardware:
+## Generated Artifacts
 
-1. **BMC/IPMI Integration**: Replace `simulators/` with Redfish API calls
-2. **Out-of-Band Management**: Use `pyghmi` or `sushy` for sensor reads
-3. **Network Testing**: Replace synthetic NIC simulator with `iperf3` calls
-4. **Thermal Telemetry**: Read `/sys/class/hwmon/` or parse `ipmitool sensor`
+Each run produces auditable outputs such as:
 
-See `simulators/README.md` for interface contracts.
+- `telemetry_timeseries.json`
+- `validation_summary.json`
+- `fleet_snapshot.csv`
+- `top_offenders.json`
+- `DEMO_PROOF.json` (fallback proof when CLI args differ)
 
-## Collaboration Model
+Artifacts are designed to mirror internal lab diagnostics rather than academic outputs.
 
-This tool sits at the intersection of:
-- **Hardware Engineering**: Validate ODM server specs, detect component defects
-- **Kernel/Firmware**: Reproduce MCE storms, thermal throttling edge cases
-- **Power Team**: Correlate power draw anomalies with workload profiles
-- **SRE/Production**: Qualify servers before cluster deployment
+---
 
-Typical workflow:
-1. Hardware team ships new server SKU to lab
-2. FleetBringUp runs bring-up suite (30-50 servers in parallel)
-3. Failures triaged: hardware defect vs. firmware bug vs. config issue
-4. Logs shared with ODM vendor or escalated to kernel team
+## Design Principles
 
-## Development
-```bash
-# Run single test module (dev mode)
-python -m tests.cpu_stress
+- Infrastructure-first (no academic abstractions)
+- Deterministic, repeatable validation
+- Failure-mode driven testing
+- Fleet-scale observability and triage
+- Artifact-based auditing
 
-# Run all unit tests
-python -m pytest tests/
+---
 
-# Format
-black fleetbringup/
-```
+## Use Cases
+
+- Server bring-up validation
+- Hardware lifecycle testing
+- Failure-mode analysis and triage
+- Fleet health inspection
+- Infrastructure tooling demonstrations
+
+---
+
+## Resume-Ready Summary
+
+FleetBringUp demonstrates hands-on systems engineering through automated hardware validation, failure injection, and fleet-scale diagnostics, delivered via reproducible CI workflows and a public interactive dashboard.
+
+---
 
 ## License
 
-Internal use only.
+MIT
