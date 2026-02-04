@@ -1,0 +1,25 @@
+test_plan:
+  name: "ECC Error Injection Test"
+  description: "Controlled failure injection for memory subsystem validation"
+  
+  tests:
+    - name: memory_integrity
+      passes: 3
+      ecc_error_threshold: 10
+      inject_ecc_error: true
+      ecc_error_slot: 3
+    
+    - name: thermal_power_sanity
+      max_cpu_temp_c: 85
+      max_dimm_temp_c: 75
+      expected_idle_power_w: 350
+      power_tolerance: 0.3
+```
+
+## /fleetbringup/configs/fleet_batch_01.txt
+```
+svr-10001
+svr-10002
+svr-10003
+svr-10004
+svr-10005
