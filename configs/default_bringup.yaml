@@ -1,0 +1,30 @@
+test_plan:
+  name: "Standard Bring-Up Validation"
+  description: "Default test suite for new server bring-up and post-repair validation"
+  
+  tests:
+    - name: cpu_stress
+      duration_sec: 60
+      failure_threshold: 0.90
+      inject_thermal_throttle: false
+    
+    - name: memory_integrity
+      passes: 3
+      ecc_error_threshold: 10
+      inject_ecc_error: false
+    
+    - name: network_connectivity
+      target_bandwidth_gbps: 10.0
+      packet_loss_threshold: 0.01
+      test_duration_sec: 10
+      inject_link_down: false
+      inject_packet_loss: false
+    
+    - name: thermal_power_sanity
+      max_cpu_temp_c: 85
+      max_dimm_temp_c: 75
+      expected_idle_power_w: 350
+      power_tolerance: 0.3
+      inject_cpu_overheat: false
+      inject_dimm_overheat: false
+      inject_power_spike: false
