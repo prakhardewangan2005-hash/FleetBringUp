@@ -1,0 +1,18 @@
+test_plan:
+  name: "Thermal Stress Validation"
+  description: "Extended thermal and power stress testing for ODM qualification"
+  
+  tests:
+    - name: cpu_stress
+      duration_sec: 300
+      failure_threshold: 0.95
+      inject_thermal_throttle: false
+    
+    - name: thermal_power_sanity
+      max_cpu_temp_c: 80
+      max_dimm_temp_c: 70
+      expected_idle_power_w: 350
+      power_tolerance: 0.2
+      inject_cpu_overheat: false
+      inject_dimm_overheat: false
+      inject_power_spike: false
